@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"os"
 	"errors"
+	"log"
+	"flag"
 )
 
 type testFileConfig struct {
@@ -45,10 +47,20 @@ var (
 	tempFiles []string
 	bogoLine = "127.0.0.1 - - [20/Aug/2015 13:01:03] \"POST /v1/stats HTTP/1.0\" 200 2"
 	tfMap map[string]*testFileConfig
+	debugLog *log.Logger
+	debug = flag.Bool("debug", false, "print debugging")
 )
 
 func setup() {
 	var err error
+
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+	if *debug {
+		debugLog = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
 	tempDir, err = ioutil.TempDir("/tmp", "logstest")
 
 	if err != nil {
@@ -56,14 +68,9 @@ func setup() {
 	}
 
 	tfMap = make(map[string]*testFileConfig)
-	// Create initial test logfiles
 	for i, _ := range testFiles {
 		tf := &testFiles[i]
-		//tf.makefile(tempDir)
 		tfMap[tf.path] = tf
-		// if TestDebug {
-		// 	common.Log.Debugf("map[%s] = %+v", tf.path, tfMap[tf.path])
-		// }
 	}
 }
 
@@ -76,7 +83,7 @@ func cleanup() {
 func TestMain(m *testing.M) {
 	setup()
 	rc := m.Run()
-//	cleanup()
+	cleanup()
 	os.Exit(rc)
 }
 
@@ -117,7 +124,7 @@ func TestSimplest(t *testing.T) {
 		panic(fmt.Sprintf("Error closing %s: %v", f.Name(), err))
 	}
 
-	lw := New(&Config{ Filename: f.Name() })
+	lw := New(&Config{ Filename: f.Name(), Log: debugLog})
 	scanner := bufio.NewScanner(lw)
 
 	var lines []string
@@ -167,7 +174,7 @@ func TestTruncation(t *testing.T) {
 	writeLines(f, startLine, nLines, template)
 	mustClose(f)
 
-	lw := New(&Config{ Filename: f.Name() })
+	lw := New(&Config{ Filename: f.Name(), Log: debugLog })
 	if err := verifyLines(lw, startLine, nLines, template); err != nil {
 		t.Errorf("Error verifying lines %d-%d in %s: %v",
 			startLine, startLine + nLines, lw.Filename, err)

@@ -4,19 +4,26 @@ import (
 	"os"
 	"time"
 	"errors"
-	"io/ioutil"
+	"log"
 )
 
 type Config struct {
 	// Filename of the logfile to watch.
 	Filename string
 
-	// Where to write messages to.
-	Log SimpleLogger
+	// Where to write messages to, if left nil, then debugging messages are
+	// discarded.
+	Log *log.Logger
 
 	// read() will block if there is nothing to be read, this is how long to
 	// wait before re-checking internally to see if there is new data.
 	PollTime time.Duration
+}
+
+func (lw *LogWatcher) debugf(s string, v ... interface{}) {
+	if lw.Log != nil {
+		lw.Log.Printf("[DEBUG] " + s, v...)
+	}
 }
 
 type LogWatcher struct {
@@ -27,10 +34,6 @@ type LogWatcher struct {
 
 func New(config *Config) *LogWatcher {
 	lw := &LogWatcher{Config: *config}
-	if lw.Log == nil {
-		// Use stderr if none supplied
-		lw.Log = &WriterLogger{s: ioutil.Discard}
-	}
 	return lw
 }
 
@@ -93,10 +96,10 @@ func (lw *LogWatcher) read(fInfo os.FileInfo, buf []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	lw.Log.Debugf("logwatcher.read: %+v", lw)
+	lw.debugf("logwatcher.read: %+v", lw)
 	if lw.lastFInfo != nil && lw.lastPos > 0 {
 		// seek to last position read
-		lw.Log.Debugf("logwatcher.read: %q seeking to %d", lw.Filename,
+		lw.debugf("logwatcher.read: %q seeking to %d", lw.Filename,
 			lw.lastPos)
 
 		if _, err := f.Seek(lw.lastPos, 0); err != nil {
@@ -109,7 +112,7 @@ func (lw *LogWatcher) read(fInfo os.FileInfo, buf []byte) (int, error) {
 		return 0, err
 	}
 
-	lw.Log.Debugf("logwatcher.read: %q read %d: %q", lw.Filename,
+	lw.debugf("logwatcher.read: %q read %d: %q", lw.Filename,
 		n, string(buf[0:n]))
 	lw.lastFInfo = fInfo
 	lw.lastPos += int64(n)

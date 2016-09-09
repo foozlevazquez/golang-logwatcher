@@ -1,9 +1,9 @@
 
-
 # golang-logwatcher
 
-`golang-logwatcher` a package fo Go to watch a logfile that changes over time
-and sends updates to a listener.
+`golang-logwatcher` a Go package to watch a logfile that may get truncated or replaced over time.
+
+- It does no parsing, but can easily be wrapped in a `bufio.Scanner` to do so.
 
 ## Installation
 
