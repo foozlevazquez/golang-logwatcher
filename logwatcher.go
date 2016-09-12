@@ -5,11 +5,15 @@ import (
 	"time"
 	"errors"
 	"log"
+	"io"
 )
 
 type Config struct {
 	// Filename of the logfile to watch.
 	Filename string
+
+	// Where to start reading, the first time we open this.
+	StartPosition	int64
 
 	// Where to write messages to, if left nil, then debugging messages are
 	// discarded.
@@ -51,6 +55,9 @@ var (
 //
 // The gating factor of how much to read is controlled by the size of buf.
 //
+// Read will only actually open and read the underlying logfile if there are
+// indications that there is new data to be read.
+//
 // NB: Read does not try to finish reading a logfile after it has been moved,
 // it moves to the new logfile.  Therefore a user of LogWatcher should keep
 // times between calls to Read short to avoid missing data.
@@ -63,29 +70,43 @@ func (lw *LogWatcher) Read(buf []byte) (int, error) {
 		doRead := false
 		newFile := false
 
+		lw.debugf("logwatcher.Read: fInfo: %+v", fInfo)
+
 		if lw.lastFInfo == nil {
 			newFile = true
+			// User can pass a checkpointed position.
+			lw.lastPos = lw.StartPosition
+			lw.debugf("logwatcher.Read: newfile, lastpos = %d", lw.lastPos)
 		} else if !os.SameFile(lw.lastFInfo, fInfo) {
 			newFile = true
+			lw.debugf("logwatcher.Read: not samefile.")
 		} else if fInfo.Size() < lw.lastFInfo.Size() {
 			// Truncated
+			lw.lastPos = 0
 			newFile = true
+			lw.debugf("logwatcher.Read: truncated.")
 		} else if fInfo.Size() > lw.lastFInfo.Size() {
 			// logfile grew, read it
 			doRead = true
-		} // else same size, don't read
+			lw.debugf("logwatcher.Read: bigger file reading.")
+		} else {
+			// same size, don't read
+			lw.debugf("logwatcher.Read: no change, ignoring.")
+			err = io.EOF
+		}
 
 		if newFile && fInfo.Size() > 0 {
 			// Reset pointers
-			lw.lastPos = 0
 			lw.lastFInfo = nil
 			doRead = true
+			lw.debugf("logwatcher.Read: bigger file reading.")
 		}
 
 		if doRead {
 			return lw.read(fInfo, buf)
 		}
 	}
+	lw.debugf("logwatcher.Read: Returning 0, %v", err)
 	return 0, err
 }
 
@@ -96,8 +117,9 @@ func (lw *LogWatcher) read(fInfo os.FileInfo, buf []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	lw.debugf("logwatcher.read: %+v", lw)
-	if lw.lastFInfo != nil && lw.lastPos > 0 {
+	if lw.lastPos > 0 {
 		// seek to last position read
 		lw.debugf("logwatcher.read: %q seeking to %d", lw.Filename,
 			lw.lastPos)
@@ -109,6 +131,7 @@ func (lw *LogWatcher) read(fInfo os.FileInfo, buf []byte) (int, error) {
 
 	n, err := f.Read(buf)
 	if err != nil {
+		lw.debugf("logwatcher.read: err = %v", err)
 		return 0, err
 	}
 

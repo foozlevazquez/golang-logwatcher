@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"flag"
+	"io"
 )
 
 type testFileConfig struct {
@@ -131,7 +132,8 @@ func TestSimplest(t *testing.T) {
 	var c = 0
 
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+		nl := scanner.Text()
+		lines = append(lines, nl)
 		if err := scanner.Err(); err != nil {
 			panic(err)
 		}
@@ -186,7 +188,7 @@ func TestTruncation(t *testing.T) {
 	}
 
 	// Should read nothing.
-	if b, err := nextRead(lw); err != nil {
+	if b, err := nextRead(lw); err != nil && err != io.EOF {
 		panic(err)
 	} else if len(b) != 0 {
 		t.Errorf("Error reading 0 bytes after truncation.")
@@ -204,7 +206,55 @@ func TestTruncation(t *testing.T) {
 		t.Errorf("Error verifying lines %d-%d in truncated %s: %v",
 			startLine, startLine + nLines, lw.Filename, err)
 	}
+	// Should read nothing.
+	if b, err := nextRead(lw); err != nil && err != io.EOF {
+		panic(err)
+	} else if len(b) != 0 {
+		t.Errorf("Error reading 0 bytes after truncation.")
+	}
 }
+
+func TestRestartFilepos(t *testing.T) {
+	template := "%d restarted log entry!"
+
+	// Write 50 lines
+	startLine := 0
+	nLines := 50
+
+	f := openTempFile(tempDir)
+	writeLines(f, startLine, nLines, template)
+	mustClose(f)
+
+	// record position
+	pos, err := fileSize(f.Name())
+	if err != nil { panic(err) }
+
+	// write next 50 lines
+	f = mustOpen(f.Name())
+	startLine = 50
+	writeLines(f, startLine, nLines, template)
+
+	// Verify, starting at line 50 position.
+	lw := New(
+		&Config{
+			Filename: f.Name(),
+			Log: debugLog,
+			StartPosition: pos,
+		})
+	if err := verifyLines(lw, startLine, nLines, template); err != nil {
+		t.Errorf("Error verifying lines %d-%d in %s: %v",
+			startLine, startLine + nLines, lw.Filename, err)
+	}
+
+	// Should read nothing.
+	if b, err := nextRead(lw); err != nil && err != io.EOF {
+		panic(err)
+	} else if len(b) != 0 {
+		t.Errorf("Error reading 0 bytes after truncation.")
+	}
+
+}
+
 
 func nextRead(lw *LogWatcher) ([]byte, error) {
 	var b = []byte{}
@@ -221,23 +271,39 @@ func verifyLines(lw *LogWatcher, startLine, nLines int, template string) error {
 	var c = 0
 	var scanner = bufio.NewScanner(lw)
 
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-		if err := scanner.Err(); err != nil {
-			return errors.New(
-				fmt.Sprintf("Error scanning line %d of %s: %v",
-					c, lw.Filename, err))
+	for done := false; !done; {
+		// Scan returns false when Scan is done.
+		if scanner.Scan() {
+			ln := scanner.Text()
+			//fmt.Printf("Scanner read %q\n", ln)
+			lines = append(lines, ln)
+			if err := scanner.Err(); err != nil {
+				return errors.New(
+					fmt.Sprintf("Error scanning line %d of %s: %v",
+						c, lw.Filename, err))
+			}
+			needLine := fmt.Sprintf(template, c + startLine)
+			if lines[c] != needLine {
+				return errors.New(fmt.Sprintf("Bad line %q != %q at line %d",
+					lines[c], needLine, c))
+			}
+			c += 1
+		} else {
+			done = true
 		}
-		needLine := fmt.Sprintf(template, c + startLine)
-		if lines[c] != needLine {
-			return errors.New(fmt.Sprintf("Bad line %q != %q at line %d",
-				lines[c], needLine, c))
-		}
-		c += 1
 	}
 	if len(lines) != nLines {
 		return errors.New(
 			fmt.Sprintf("Wrong # of lines %d != %d", len(lines), nLines))
 	}
 	return nil
+}
+
+
+func fileSize(filename string) (int64, error) {
+	if fInfo, err := os.Stat(filename); err != nil {
+		return 0, err
+	} else {
+		return fInfo.Size(), nil
+	}
 }
