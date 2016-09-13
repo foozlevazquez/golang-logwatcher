@@ -2,7 +2,6 @@ package logwatcher
 
 import (
 	"os"
-	"time"
 	"errors"
 	"log"
 	"io"
@@ -19,9 +18,6 @@ type Config struct {
 	// discarded.
 	Log *log.Logger
 
-	// read() will block if there is nothing to be read, this is how long to
-	// wait before re-checking internally to see if there is new data.
-	PollTime time.Duration
 }
 
 func (lw *LogWatcher) debugf(s string, v ... interface{}) {
@@ -34,6 +30,10 @@ type LogWatcher struct {
 	Config
 	lastPos   int64
 	lastFInfo os.FileInfo
+}
+
+func (lw *LogWatcher) GetLastPosition() int64 {
+	return lw.lastPos
 }
 
 func New(config *Config) *LogWatcher {
