@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"io"
+	"time"
 )
 
 type Config struct {
@@ -32,8 +33,25 @@ type LogWatcher struct {
 	lastFInfo os.FileInfo
 }
 
-func (lw *LogWatcher) GetLastPosition() int64 {
+func (lw *LogWatcher) LastPosition() int64 {
 	return lw.lastPos
+}
+
+func (lw *LogWatcher) Size() (int64, error) {
+	if lw.lastFInfo != nil {
+		return lw.lastFInfo.Size(), nil
+	} else {
+		return 0, errors.New("No current state of file")
+	}
+}
+
+
+func (lw *LogWatcher) ModTime() (time.Time, error) {
+	if lw.lastFInfo != nil {
+		return lw.lastFInfo.ModTime(), nil
+	} else {
+		return time.Time{}, errors.New("No current state of file")
+	}
 }
 
 func New(config *Config) *LogWatcher {
