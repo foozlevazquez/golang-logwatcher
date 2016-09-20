@@ -6,14 +6,22 @@ import (
 	"log"
 	"io"
 	"time"
+	"syscall"
 )
 
 type Config struct {
 	// Filename of the logfile to watch.
 	Filename string
 
-	// Where to start reading, the first time we open this.
+	// Where to start reading, the first time we open this, if the DeviceID
+	// and FileID match as well.
 	StartPosition	int64
+
+	// What device we're on (Unix specific I know).
+	DeviceID		int32
+
+	// What file we last were reading (Inode).
+	FileID			uint64
 
 	// Where to write messages to, if left nil, then debugging messages are
 	// discarded.
@@ -45,12 +53,27 @@ func (lw *LogWatcher) Size() (int64, error) {
 	}
 }
 
-
 func (lw *LogWatcher) ModTime() (time.Time, error) {
 	if lw.lastFInfo != nil {
 		return lw.lastFInfo.ModTime(), nil
 	} else {
 		return time.Time{}, errors.New("No current state of file")
+	}
+}
+
+func (lw *LogWatcher) DeviceID() (uint64, error) {
+	if lw.lastFInfo != nil {
+		return lw.lastFInfo.Sys().(syscall.Stat_t).Dev, nil
+	} else {
+		return 0, errors.New("No current state of file")
+	}
+}
+
+func (lw *LogWatcher) Inode() (uint64, error) {
+	if lw.lastFInfo != nil {
+		return lw.lastFInfo.Sys().(syscall.Stat_t).Ino, nil
+	} else {
+		return 0, errors.New("No current state of file")
 	}
 }
 
