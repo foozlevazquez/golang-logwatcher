@@ -41,6 +41,16 @@ type LogWatcher struct {
 	lastFInfo os.FileInfo
 }
 
+func (lw *LogWatcher) SetLastPosition(p int64) error {
+	if p > lw.Size() {
+		return errors.New(
+			fmt.Sprintf("logwatcher: SetLastPosition(%d) past size (%d)",
+				p, lw.Size()))
+	}
+	lw.lastPos = p
+	return nil
+}
+
 func (lw *LogWatcher) LastPosition() int64 {
 	return lw.lastPos
 }
