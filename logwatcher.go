@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 	"syscall"
+	"fmt"
 )
 
 type Config struct {
@@ -42,10 +43,14 @@ type LogWatcher struct {
 }
 
 func (lw *LogWatcher) SetLastPosition(p int64) error {
-	if p > lw.Size() {
+	size, err := lw.Size()
+	if err != nil {
+		return err
+	}
+	if p > size {
 		return errors.New(
 			fmt.Sprintf("logwatcher: SetLastPosition(%d) past size (%d)",
-				p, lw.Size()))
+				p, size))
 	}
 	lw.lastPos = p
 	return nil
