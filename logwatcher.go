@@ -145,6 +145,10 @@ func (lw *LogWatcher) Read(buf []byte) (int, error) {
 			// logfile grew, read it
 			doRead = true
 			lw.debugf("logwatcher.Read: bigger file reading.")
+		} else if fInfo.Size() > lw.lastPos {
+			// logfile grew, read it
+			doRead = true
+			lw.debugf("logwatcher.Read: stuff left to read, reading.")
 		} else {
 			// same size, don't read
 			lw.debugf("logwatcher.Read: no change, ignoring.")

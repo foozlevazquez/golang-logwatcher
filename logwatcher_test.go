@@ -12,42 +12,12 @@ import (
 	"io"
 )
 
-type testFileConfig struct {
-	name string
-	steps []int
-	stepCount int
-	size int
-	path string
-}
-
-var testFiles = []testFileConfig{
-	testFileConfig{
-		name: "always_empty.log",
-		steps: []int{0},
-	},
-	testFileConfig{
-		name: "starts_empty.log",
-		steps: []int{ 0, 1, 2, 3 },
-	},
-	testFileConfig{
-		name: "big_static.log",
-		steps: []int{65535},
-	},
-	testFileConfig{
-		name: "big_steps.log",
-		steps: []int{ 65335, 65335, 65335, 65335 },
-	},
-	testFileConfig{
-		name: "big_steps_start_empty.log",
-		steps: []int{ 65335, 65335, 65335, 65335 },
-	},
-}
 
 var (
 	tempDir string
 	tempFiles []string
 	bogoLine = "127.0.0.1 - - [20/Aug/2015 13:01:03] \"POST /v1/stats HTTP/1.0\" 200 2"
-	tfMap map[string]*testFileConfig
+
 	debugLog *log.Logger
 	debug = flag.Bool("debug", false, "print debugging")
 )
@@ -68,11 +38,6 @@ func setup() {
 		panic(fmt.Sprintf("Problem making tempdir: %v", err))
 	}
 
-	tfMap = make(map[string]*testFileConfig)
-	for i, _ := range testFiles {
-		tf := &testFiles[i]
-		tfMap[tf.path] = tf
-	}
 }
 
 func cleanup() {
