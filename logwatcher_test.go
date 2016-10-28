@@ -265,6 +265,49 @@ func verifyLines(lw *LogWatcher, startLine, nLines int, template string) error {
 }
 
 
+func TestResetLastState(t *testing.T) {
+
+	f := openTempFile(tempDir)
+	nLines := 10
+	template := "%d log entry!"
+	knownSize := 0
+
+	for i := 0; i < nLines; i++ {
+		s := fmt.Sprintf(template + "\n", i)
+		knownSize += len(s)
+		_, err := f.Write([]byte(s))
+		if err != nil {
+			panic(fmt.Sprintf("Error writing line %d to %s: %v",
+				i, f.Name, err))
+		}
+	}
+	if err := f.Close(); err != nil {
+		panic(fmt.Sprintf("Error closing %s: %v", f.Name(), err))
+	}
+
+	lw := New(&Config{ Filename: f.Name(), Log: debugLog})
+
+	if err := lw.ResetLastState(); err != nil {
+		t.Error(err)
+	}
+	size, err := lw.Size()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if size != int64(knownSize) {
+		t.Errorf("Mismatching sizes %d (expected) != %d (got)",
+			knownSize, size)
+	}
+
+	if err = lw.SetLastPosition(size); err != nil {
+		t.Error(err)
+	}
+	if lw.LastPosition() != size {
+		t.Errorf("Incorrect last position.")
+	}
+}
+
 func fileSize(filename string) (int64, error) {
 	if fInfo, err := os.Stat(filename); err != nil {
 		return 0, err

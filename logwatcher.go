@@ -56,6 +56,18 @@ func (lw *LogWatcher) SetLastPosition(p int64) error {
 	return nil
 }
 
+// ResetLastState makes the LogWatcher last status current to whatever state
+// the file is in. It does not update the LastPosition.
+
+func (lw *LogWatcher) ResetLastState() error {
+	if fInfo, err := os.Stat(lw.Filename); err != nil {
+		return err
+	} else {
+		lw.lastFInfo = fInfo
+		return nil
+	}
+}
+
 func (lw *LogWatcher) LastPosition() int64 {
 	return lw.lastPos
 }
